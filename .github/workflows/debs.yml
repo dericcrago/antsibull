@@ -50,7 +50,7 @@ jobs:
 
           cd ../ansible-build-data/
           git checkout tags/${MICRO_BUILD_VERSION}
-          export DEB_RELEASE="100.git$(date --utc --date="$(git log -n 1 --format="%ci")" +%Y%m%d%H%M).$(git log -n 1 --format="%h").$(git rev-parse --abbrev-ref HEAD | sed 's/[-_.\/]//g')"
+          export DEB_RELEASE=100.git$(date --utc --date="$(git log -n 1 --format="%ci")" +%Y%m%d%H%M).$(git log -n 1 --format="%h").$(git rev-parse --abbrev-ref HEAD | sed 's/[-_.\/]//g')
 
           cd ../built/
           rm -rf deb-build/
@@ -61,9 +61,10 @@ jobs:
 
             * ${MICRO_BUILD_VERSION} release
 
-          -- Ansible, Inc. <info@ansible.com>  Thu, 21 Jan 2021 20:41:33 +0000
+           -- Ansible, Inc. <info@ansible.com>  Thu, 21 Jan 2021 20:41:33 +0000
           EOF
 
+          cat deb-build/${DIST}/${NAME}-${MICRO_BUILD_VERSION}/debian/changelog
           export DEBUILD='debuild --source-option="-I" -uc -us'
 
           cd deb-build/${DIST}/${NAME}-${MICRO_BUILD_VERSION}
