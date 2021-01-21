@@ -1,0 +1,78 @@
+---
+name: debs
+on:
+  push:
+    branches:
+      - build_debs
+jobs:
+  deb:
+    name: build debs
+    runs-on: ubuntu-20.04
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v2
+
+      - name: build all the debs
+        run: |
+          mkdir -p ~/debs
+          sudo apt -y install --no-install-recommends python3-pip python3-testresources make python3-packaging python3-straight.plugin python3-docutils devscripts build-essential:native cdbs debhelper dh-python pbuilder python3-all gcc python3-dev
+          sudo ln -s python3 /usr/bin/python
+          PATH="${PATH}:${HOME}/.local/bin/"
+          python3 -m pip install poetry
+
+          poetry install
+          poetry update
+
+          git clone https://github.com/ansible-community/ansible-build-data.git
+          git clone https://github.com/ansible/ansible.git
+
+          export DIST=$(lsb_release --codename --short)
+          export ARCH=amd64
+          export NAME=ansible
+          export MINOR_BUILD_VERSION=2.10
+          export MICRO_BUILD_VERSION=2.10.5
+
+          rm -rf built
+          mkdir built
+          poetry run antsibull-build rebuild-single ${MICRO_BUILD_VERSION} --data-dir ansible-build-data/${MINOR_BUILD_VERSION} --build-file ${NAME}-${MINOR_BUILD_VERSION}.build --deps-file ${NAME}-${MICRO_BUILD_VERSION}.deps --sdist-dir built --debian
+
+          cd ansible/
+          git fetch --prune --tags
+          git checkout tags/v${MICRO_BUILD_VERSION}
+          git clean -f -- .
+
+          sudo apt -y install --no-install-recommends make python3-packaging python3-straight.plugin python3-docutils devscripts build-essential:native cdbs debhelper dh-python pbuilder python3-all
+          time DEB_DIST=${DIST} PBUILDER_BIN='sudo pbuilder' make deb
+          cp -av deb-build/${DIST}/*.deb ~/debs/
+
+          cd ../ansible-build-data/
+          git checkout tags/${MICRO_BUILD_VERSION}
+          export DEB_RELEASE="100.git$(date --utc --date="$(git log -n 1 --format="%ci")" +%Y%m%d%H%M).$(git log -n 1 --format="%h").$(git rev-parse --abbrev-ref HEAD | sed 's/[-_.\/]//g')"
+
+          cd ../built/
+          rm -rf deb-build/
+          mkdir -p deb-build/${DIST}
+          tar -C deb-build/${DIST} -xzf ${NAME}-${MICRO_BUILD_VERSION}.tar.gz
+          cat > deb-build/${DIST}/${NAME}-${MICRO_BUILD_VERSION}/debian/changelog << EOF
+          ${NAME} (${MICRO_BUILD_VERSION}-${DEB_RELEASE}~${DIST}) ${DIST}; urgency=low
+
+            * ${MICRO_BUILD_VERSION} release
+
+          -- Ansible, Inc. <info@ansible.com>  Thu, 21 Jan 2021 20:41:33 +0000
+          EOF
+
+          export DEBUILD='debuild --source-option="-I" -uc -us'
+
+          cd deb-build/${DIST}/${NAME}-${MICRO_BUILD_VERSION}/ && eval ${DEBUILD} -S && cd -
+
+          export PBUILDER_OPTS="--debootstrapopts --variant=buildd --architecture ${ARCH} --debbuildopts -b --distribution ${DIST} --basetgz /var/cache/pbuilder/${DIST}-${ARCH}-base.tgz --buildresult $(pwd)/deb-build/${DIST}"
+          sudo pbuilder create ${PBUILDER_OPTS} --othermirror "deb http://archive.ubuntu.com/ubuntu ${DIST} universe"
+          sudo pbuilder update ${PBUILDER_OPTS}
+          sudo pbuilder build ${PBUILDER_OPTS} deb-build/${DIST}/${NAME}_${MICRO_BUILD_VERSION}-${DEB_RELEASE}~${DIST}.dsc
+          cp -av deb-build/${DIST}/*.deb ~/debs/
+
+      - name: upload v2.10.5 focal debs
+        uses: actions/upload-artifact@v2
+        with:
+          name: v2.10.5-focal-debs
+          path: ~/debs/*.deb
