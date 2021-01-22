@@ -80,6 +80,12 @@ jobs:
           sudo pbuilder build ${PBUILDER_OPTS} deb-build/${DIST}/${NAME}_${MICRO_BUILD_VERSION}-${DEB_RELEASE}~${DIST}.dsc
           cp -av deb-build/${DIST}/*.deb ${HOME}/debs/
 
+      - name: upload v2.10.5 tarball
+        uses: actions/upload-artifact@v2
+        with:
+          name: ansible-2.10.5.tar.gz
+          path: built/ansible-2.10.5.tar.gz
+
       - name: upload v2.10.5 focal debs
         uses: actions/upload-artifact@v2
         with:
