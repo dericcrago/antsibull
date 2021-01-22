@@ -18,6 +18,9 @@ jobs:
           # cd antsibull
           echo $(pwd)
           mkdir -p ${HOME}/debs
+          ansible --version
+          sudo apt -y remove ansible
+          sudo apt -y autoremove
           sudo apt -y install --no-install-recommends python3-pip python3-testresources make python3-packaging python3-straight.plugin python3-docutils devscripts build-essential:native cdbs debhelper dh-python pbuilder python3-all gcc python3-dev
           sudo ln -sf python3 /usr/bin/python
           PATH="${PATH}:${HOME}/.local/bin/"
